@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Survival Game: Shooting & Loot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="hud">
+            <div class="hud-item">Health: <span id="hp">100</span>%</div>
+            <div class="hud-item">Ammo: <span id="ammo">30</span>/30</div>
+            <div class="hud-item">Magazines: <span id="mags">3</span>/10</div>
+            <div class="hud-item">Grenades: <span id="grenades">0</span>/10</div>
+            <div class="hud-item">Kills: <span id="kills">0</span></div>
+            <div id="inventory">
+                <h3>Inventory</h3>
+                <div id="inv-items"></div>
+            </div>
+        </div>
+        <div id="start-screen" class="overlay">
+            <h1>Survival Game</h1>
+            <p>WASD to move | Mouse to aim | Click to shoot</p>
+            <p>Kill NPCs to get loot drops!</p>
+            <button id="start-btn">Start Survival</button>
+        </div>
+        <div id="game-over" class="overlay hidden">
+            <h1>Game Over</h1>
+            <p>Final Kills: <span id="final-kills">0</span></p>
+            <button id="restart-btn">Try Again</button>
+        </div>
+        <div id="mobile-controls">
+            <div id="move-joystick-container" class="joystick-container">
+                <div id="move-joystick-base" class="joystick-base">
+                    <div id="move-joystick-stick" class="joystick-stick"></div>
+                </div>
+            </div>
+            <div id="action-buttons">
+                <button id="btn-reload" class="mobile-btn">R</button>
+                <button id="btn-grenade" class="mobile-btn">G</button>
+                <button id="btn-shoot" class="mobile-btn shoot-btn">SHOOT</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

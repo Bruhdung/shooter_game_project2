@@ -1,0 +1,202 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #0a0a0a;
+    font-family: 'Courier New', Courier, monospace;
+    color: #00ff00;
+    touch-action: none;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    background-color: #1a1a1a;
+    box-shadow: 0 0 20px rgba(0,255,0,0.2);
+    cursor: crosshair;
+}
+
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.hud-item {
+    font-size: 20px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px 15px;
+    border: 1px solid #00ff00;
+}
+
+#inventory {
+    margin-top: 20px;
+}
+
+#inventory h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+}
+
+#inv-items {
+    display: flex;
+    gap: 10px;
+}
+
+.inv-slot {
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 255, 0, 0.1);
+    border: 1px dashed #00ff00;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}
+
+.overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 40px;
+    border: 2px solid #00ff00;
+    text-align: center;
+    z-index: 10;
+    min-width: 300px;
+}
+
+.overlay h1 {
+    font-size: 48px;
+    margin-bottom: 20px;
+    color: #00ff00;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+.overlay p {
+    font-size: 18px;
+    margin-bottom: 30px;
+}
+
+.hidden {
+    display: none;
+}
+
+button {
+    background: transparent;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+    padding: 10px 30px;
+    font-size: 20px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+button:hover {
+    background: #00ff00;
+    color: #000;
+}
+
+/* Mobile Controls */
+#mobile-controls {
+    display: none;
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    z-index: 100;
+    pointer-events: none;
+    user-select: none;
+}
+
+.joystick-container {
+    position: absolute;
+    bottom: 20px;
+    left: 40px;
+    width: 120px;
+    height: 120px;
+    pointer-events: auto;
+}
+
+.joystick-base {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 255, 0, 0.1);
+    border: 2px solid rgba(0, 255, 0, 0.3);
+    border-radius: 50%;
+    position: relative;
+}
+
+.joystick-stick {
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 255, 0, 0.5);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+#action-buttons {
+    position: absolute;
+    bottom: 20px;
+    right: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-end;
+    pointer-events: auto;
+}
+
+.mobile-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    background: rgba(0, 255, 0, 0.1);
+    border: 2px solid rgba(0, 255, 0, 0.5);
+    color: #00ff00;
+    touch-action: manipulation;
+}
+
+.shoot-btn {
+    width: 90px;
+    height: 90px;
+    font-size: 18px;
+    background: rgba(255, 71, 87, 0.2);
+    border-color: rgba(255, 71, 87, 0.6);
+    color: #ff4757;
+}
+
+/* Only show mobile controls on touch devices or small screens */
+@media (max-width: 1024px), (pointer: coarse) {
+    #mobile-controls {
+        display: block;
+    }
+    
+    #hud {
+        transform: scale(0.8);
+        top: 10px;
+        left: 10px;
+    }
+}
