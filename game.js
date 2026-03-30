@@ -33,9 +33,16 @@ let moveJoystick = { active: false, x: 0, y: 0, startX: 0, startY: 0 };
 let joystickTouchId = null;
 let isManualAiming = false;
 let aimTouchId = null;
+let autoAimEnabled = true; // Auto-aim enabled by default
 const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-window.addEventListener('keydown', (e) => keys[e.code] = true);
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'KeyQ') {
+        autoAimEnabled = !autoAimEnabled;
+        console.log(`Auto-aim ${autoAimEnabled ? 'enabled' : 'disabled'}`);
+    }
+});
 window.addEventListener('keyup', (e) => {
     keys[e.code] = false;
     if (e.code === 'KeyR' && gameRunning) player.reload();
@@ -199,8 +206,8 @@ class Player {
             this.y += moveJoystick.y * this.speed;
         }
 
-        // Auto-aim on mobile
-        if (isMobile && !isManualAiming && npcs.length > 0) {
+        // Auto-aim: Straight to nearest NPC if enabled and not manual aiming
+        if (autoAimEnabled && !isManualAiming && npcs.length > 0) {
             let nearestNpc = null;
             let minDist = Infinity;
             
@@ -213,13 +220,12 @@ class Player {
             });
             
             if (nearestNpc) {
-                // Smoothly interpolate or just snap?
-                // For better feel, let's snap for now, but in a real game we might interpolate
+                // Point straight to NPC center
                 mousePos.x = nearestNpc.x;
                 mousePos.y = nearestNpc.y;
             }
-        } else if (moveJoystick.active && !isManualAiming) {
-            // If no NPCs, aim in movement direction
+        } else if (isMobile && moveJoystick.active && !isManualAiming) {
+            // If on mobile and no NPCs, aim in movement direction
             mousePos.x = this.x + moveJoystick.x * 100;
             mousePos.y = this.y + moveJoystick.y * 100;
         }
