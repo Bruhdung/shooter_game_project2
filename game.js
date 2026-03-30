@@ -471,7 +471,7 @@ class Grenade {
 class NPC {
     constructor(playerLevel) {
         this.radius = 15 + Math.random() * 10;
-        this.color = '#ff4757';
+        this.color = '#ff47e0ff';
         this.speed = 1.5 + Math.random() * 2 + (playerLevel * 0.1);
         this.hp = 30 + (playerLevel * 10);
         this.onFire = false;
@@ -536,7 +536,7 @@ class Wall {
 class ExplodingNPC extends NPC {
     constructor(playerLevel) {
         super(playerLevel);
-        this.color = '#d63031'; // Red color
+        this.color = '#8B0000'; // Deep red color
         this.speed *= 1.2; // A bit faster
     }
 
