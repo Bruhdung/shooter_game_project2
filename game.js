@@ -30,6 +30,10 @@ let kills = 0;
 const keys = {};
 let mousePos = { x: 0, y: 0 };
 let moveJoystick = { active: false, x: 0, y: 0, startX: 0, startY: 0 };
+let joystickTouchId = null;
+let isManualAiming = false;
+let aimTouchId = null;
+const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
 window.addEventListener('keydown', (e) => keys[e.code] = true);
 window.addEventListener('keyup', (e) => {
@@ -49,8 +53,9 @@ window.addEventListener('mousedown', () => {
 // Mobile input handling
 if (moveBase) {
     moveBase.addEventListener('touchstart', (e) => {
+        const touch = e.changedTouches[0];
+        joystickTouchId = touch.identifier;
         moveJoystick.active = true;
-        const touch = e.touches[0];
         const rect = moveBase.getBoundingClientRect();
         moveJoystick.startX = rect.left + rect.width / 2;
         moveJoystick.startY = rect.top + rect.height / 2;
@@ -59,15 +64,34 @@ if (moveBase) {
 
     moveBase.addEventListener('touchmove', (e) => {
         if (!moveJoystick.active) return;
-        handleJoystickMove(e.touches[0]);
-        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                handleJoystickMove(touch);
+                e.preventDefault();
+            }
+        }
     }, { passive: false });
 
-    window.addEventListener('touchend', () => {
-        moveJoystick.active = false;
-        moveJoystick.x = 0;
-        moveJoystick.y = 0;
-        if (moveStick) moveStick.style.transform = `translate(-50%, -50%)`;
+    window.addEventListener('touchend', (e) => {
+        // If the lifted touch was the joystick touch, reset joystick
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                joystickTouchId = null;
+                moveJoystick.active = false;
+                moveJoystick.x = 0;
+                moveJoystick.y = 0;
+                if (moveStick) moveStick.style.transform = `translate(-50%, -50%)`;
+            }
+        }
+
+        // If the lifted touch was the aim touch, reset manual aiming
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === aimTouchId) {
+                aimTouchId = null;
+                isManualAiming = false;
+            }
+        }
     });
 }
 
@@ -94,20 +118,25 @@ if (btnGrenade) btnGrenade.addEventListener('touchstart', (e) => { if (gameRunni
 
 // Handle touch for aiming on mobile (touching anywhere else on canvas)
 canvas.addEventListener('touchstart', (e) => {
-    if (!moveJoystick.active) {
-        const touch = e.touches[0];
+    if (!moveJoystick.active && aimTouchId === null) {
+        const touch = e.changedTouches[0];
+        aimTouchId = touch.identifier;
+        isManualAiming = true;
         const rect = canvas.getBoundingClientRect();
         mousePos.x = touch.clientX - rect.left;
         mousePos.y = touch.clientY - rect.top;
     }
 });
 canvas.addEventListener('touchmove', (e) => {
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    // Only update aim if we are not touching a button (pointer-events handles some of this but let's be safe)
-    if (e.target === canvas) {
-        mousePos.x = touch.clientX - rect.left;
-        mousePos.y = touch.clientY - rect.top;
+    // Check for our specific aim touch
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === aimTouchId) {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = touch.clientX - rect.left;
+            mousePos.y = touch.clientY - rect.top;
+            e.preventDefault();
+        }
     }
 }, { passive: false });
 
@@ -168,12 +197,31 @@ class Player {
         if (moveJoystick.active) {
             this.x += moveJoystick.x * this.speed;
             this.y += moveJoystick.y * this.speed;
+        }
+
+        // Auto-aim on mobile
+        if (isMobile && !isManualAiming && npcs.length > 0) {
+            let nearestNpc = null;
+            let minDist = Infinity;
             
-            // Auto-aim in movement direction if not explicitly aiming elsewhere
-            // (Only if we haven't touched the screen to aim recently, 
-            // but for simplicity we'll just update mousePos here too)
-            // mousePos.x = this.x + moveJoystick.x * 100;
-            // mousePos.y = this.y + moveJoystick.y * 100;
+            npcs.forEach(npc => {
+                const dist = Math.hypot(npc.x - this.x, npc.y - this.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestNpc = npc;
+                }
+            });
+            
+            if (nearestNpc) {
+                // Smoothly interpolate or just snap?
+                // For better feel, let's snap for now, but in a real game we might interpolate
+                mousePos.x = nearestNpc.x;
+                mousePos.y = nearestNpc.y;
+            }
+        } else if (moveJoystick.active && !isManualAiming) {
+            // If no NPCs, aim in movement direction
+            mousePos.x = this.x + moveJoystick.x * 100;
+            mousePos.y = this.y + moveJoystick.y * 100;
         }
 
         // Keep in bounds
@@ -547,6 +595,12 @@ function gameOver() {
     cancelAnimationFrame(animationId);
     clearInterval(spawnInterval);
     finalKillsEl.textContent = kills;
+    gameOverScreen.classList.remove('hidden');
+}
+
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
     gameOverScreen.classList.remove('hidden');
 }
 
