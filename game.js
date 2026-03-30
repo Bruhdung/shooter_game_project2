@@ -1,4 +1,4 @@
-let canvas, ctx, hpEl, ammoEl, magsEl, grenadesEl, killsEl, invItemsEl, startScreen, gameOverScreen, startBtn, restartBtn, finalKillsEl, levelEl, xpEl, xpNextEl, upgradeScreen, upgradeOptionsEl;
+let canvas, ctx, hpEl, ammoEl, magsEl, grenadesEl, killsEl, invItemsEl, startScreen, gameOverScreen, startBtn, restartBtn, finalKillsEl, levelEl, xpEl, xpNextEl, upgradeScreen, upgradeOptionsEl, shieldEl;
 let moveStick, moveBase, btnShoot, btnReload, btnGrenade;
 
 // Initialize elements
@@ -6,6 +6,7 @@ function initElements() {
     canvas = document.getElementById('gameCanvas');
     if (canvas) ctx = canvas.getContext('2d');
     hpEl = document.getElementById('hp');
+    shieldEl = document.getElementById('shield');
     ammoEl = document.getElementById('ammo');
     magsEl = document.getElementById('mags');
     grenadesEl = document.getElementById('grenades');
@@ -204,6 +205,10 @@ class Player {
         this.iceShot = false;
         this.rocketLauncher = false;
         this.rocketTimer = 0;
+        this.message = "";
+        this.messageTimer = 0;
+        this.shields = 0;
+        this.maxShields = 3;
     }
 
     draw() {
@@ -220,10 +225,33 @@ class Player {
         ctx.strokeStyle = '#fff';
         ctx.stroke();
 
+        // Draw shields
+        for (let i = 0; i < this.shields; i++) {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 5 + (i * 5), 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0, 255, 255, ${0.5 - (i * 0.1)})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
         // Gun
         ctx.fillStyle = '#fff';
         ctx.fillRect(this.radius - 5, -5, 15, 10);
         ctx.restore();
+
+        // Message above player
+        if (this.messageTimer > 0) {
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.font = "bold 18px Courier New";
+            ctx.textAlign = "center";
+            ctx.strokeText(this.message, this.x, this.y - this.radius - 20);
+            ctx.fillText(this.message, this.x, this.y - this.radius - 20);
+            ctx.restore();
+            this.messageTimer--;
+        }
     }
 
     update() {
@@ -339,6 +367,9 @@ class Player {
             this.updateHUD();
         } else {
             // Out of ammo visual hint
+            this.message = Math.random() < 0.5 ? "ran out of ammo!" : "need reload!";
+            this.messageTimer = 120; // 2 seconds
+
             ctx.fillStyle = '#ff4757';
             ctx.font = '20px Courier New';
             ctx.fillText('OUT OF AMMO! PRESS R TO RELOAD', canvas.width/2 - 150, canvas.height/2 + 100);
@@ -366,6 +397,11 @@ class Player {
     }
 
     takeDamage(amt) {
+        if (this.shields > 0) {
+            this.shields--;
+            this.updateHUD();
+            return;
+        }
         this.hp -= amt;
         this.updateHUD();
         if (this.hp <= 0) gameOver();
@@ -378,6 +414,10 @@ class Player {
             this.xp -= this.xpToNextLevel;
             this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5);
             console.log(`Level up! Reached level ${this.level}`);
+            
+            // Update spawn rate: decrease interval by 100ms per level, floor at 500ms
+            updateSpawnRate();
+            
             showUpgradeScreen();
         }
         this.updateHUD();
@@ -385,6 +425,7 @@ class Player {
 
     updateHUD() {
         hpEl.textContent = Math.max(0, Math.floor(this.hp));
+        if (shieldEl) shieldEl.textContent = this.shields;
         ammoEl.textContent = `${this.ammo}/${this.maxAmmo}`;
         magsEl.textContent = `${this.mags}/${this.maxMags}`;
         grenadesEl.textContent = `${this.grenades}/${this.maxGrenades}`;
@@ -533,13 +574,15 @@ class NPC {
     constructor(playerLevel) {
         this.radius = 15 + Math.random() * 10;
         this.color = '#ff47e0ff';
-        this.speed = 1.5 + Math.random() * 2 + (playerLevel * 0.1);
-        this.hp = 30 + (playerLevel * 10);
+        this.hp = 30 + (playerLevel * 20); // Increased health scaling (was 10)
         this.onFire = false;
         this.fireTicks = 0;
         this.frozen = false;
         this.frozenTicks = 0;
         
+        // Use a fixed speed range, speed does not scale with level
+        this.speed = 1.5 + Math.random() * 1; 
+
         // Spawn at random edge
         if (Math.random() < 0.5) {
             this.x = Math.random() < 0.5 ? 0 - this.radius : canvas.width + this.radius;
@@ -705,6 +748,13 @@ function spawnNPC() {
             npcs.push(new NPC(player.level));
         }
     }
+}
+
+function updateSpawnRate() {
+    if (spawnInterval) clearInterval(spawnInterval);
+    // Interval decreases by 150ms per level, minimum 300ms
+    const interval = Math.max(300, 1500 - (player.level - 1) * 150);
+    spawnInterval = setInterval(spawnNPC, interval);
 }
 
 function update() {
@@ -899,8 +949,8 @@ function startGame() {
         
         if (player) player.updateHUD();
         
-        if (spawnInterval) clearInterval(spawnInterval);
-        spawnInterval = setInterval(spawnNPC, 1500);
+        // Initial spawn rate setup
+        updateSpawnRate();
         
         if (animationId) cancelAnimationFrame(animationId);
         gameLoop();
@@ -923,8 +973,8 @@ const allUpgrades = [
     { id: 'fire', title: 'Incendiary Rounds', description: 'Bullets set enemies on fire, dealing damage over time.' },
     { id: 'ice', title: 'Cryo Rounds', description: 'Bullets slow down enemies.' },
     { id: 'hp', title: 'Health Boost', description: 'Increase max HP by 20.' },
-    { id: 'speed', title: 'Speed Boost', description: 'Increase player movement speed.' },
     { id: 'rocket', title: 'Rocket Launcher', description: 'Automatically fire a rocket every 5 seconds.' },
+    { id: 'shield', title: 'Shield', description: 'Gain a shield that blocks one hit. Max 3 stacks.' },
 ];
 
 function showUpgradeScreen() {
@@ -965,12 +1015,13 @@ function applyUpgrade(upgradeId) {
         case 'hp':
             player.hp = Math.min(player.hp + 20, 100); // Assuming 100 is max for now
             break;
-        case 'speed':
-            player.speed += 1;
-            break;
         case 'rocket':
             player.rocketLauncher = true;
             player.rocketTimer = 300; // Start the 5-sec countdown
+            break;
+        case 'shield':
+            player.shields = Math.min(player.shields + 1, player.maxShields);
+            player.updateHUD();
             break;
     }
 
