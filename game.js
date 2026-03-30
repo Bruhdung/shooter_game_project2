@@ -245,12 +245,11 @@ class Player {
             ctx.fillStyle = "#fff";
             ctx.strokeStyle = "#000";
             ctx.lineWidth = 3;
-            ctx.font = "bold 18px Courier New";
+            ctx.font = "bold 18px monospace";
             ctx.textAlign = "center";
             ctx.strokeText(this.message, this.x, this.y - this.radius - 20);
             ctx.fillText(this.message, this.x, this.y - this.radius - 20);
             ctx.restore();
-            this.messageTimer--;
         }
     }
 
@@ -351,6 +350,8 @@ class Player {
                 this.grenadeList.splice(i, 1);
             }
         });
+
+        if (this.messageTimer > 0) this.messageTimer--;
     }
 
     shoot() {
