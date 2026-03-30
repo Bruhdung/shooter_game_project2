@@ -1,23 +1,28 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const hpEl = document.getElementById('hp');
-const ammoEl = document.getElementById('ammo');
-const magsEl = document.getElementById('mags');
-const grenadesEl = document.getElementById('grenades');
-const killsEl = document.getElementById('kills');
-const invItemsEl = document.getElementById('inv-items');
-const startScreen = document.getElementById('start-screen');
-const gameOverScreen = document.getElementById('game-over');
-const startBtn = document.getElementById('start-btn');
-const restartBtn = document.getElementById('restart-btn');
-const finalKillsEl = document.getElementById('final-kills');
+let canvas, ctx, hpEl, ammoEl, magsEl, grenadesEl, killsEl, invItemsEl, startScreen, gameOverScreen, startBtn, restartBtn, finalKillsEl;
+let moveStick, moveBase, btnShoot, btnReload, btnGrenade;
 
-// Mobile UI elements
-const moveStick = document.getElementById('move-joystick-stick');
-const moveBase = document.getElementById('move-joystick-base');
-const btnShoot = document.getElementById('btn-shoot');
-const btnReload = document.getElementById('btn-reload');
-const btnGrenade = document.getElementById('btn-grenade');
+// Initialize elements
+function initElements() {
+    canvas = document.getElementById('gameCanvas');
+    if (canvas) ctx = canvas.getContext('2d');
+    hpEl = document.getElementById('hp');
+    ammoEl = document.getElementById('ammo');
+    magsEl = document.getElementById('mags');
+    grenadesEl = document.getElementById('grenades');
+    killsEl = document.getElementById('kills');
+    invItemsEl = document.getElementById('inv-items');
+    startScreen = document.getElementById('start-screen');
+    gameOverScreen = document.getElementById('game-over');
+    startBtn = document.getElementById('start-btn');
+    restartBtn = document.getElementById('restart-btn');
+    finalKillsEl = document.getElementById('final-kills');
+
+    moveStick = document.getElementById('move-joystick-stick');
+    moveBase = document.getElementById('move-joystick-base');
+    btnShoot = document.getElementById('btn-shoot');
+    btnReload = document.getElementById('btn-reload');
+    btnGrenade = document.getElementById('btn-grenade');
+}
 
 // Game state
 let gameRunning = false;
@@ -36,70 +41,98 @@ let aimTouchId = null;
 let autoAimEnabled = true; // Auto-aim enabled by default
 const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-window.addEventListener('keydown', (e) => {
-    keys[e.code] = true;
-    if (e.code === 'KeyQ') {
-        autoAimEnabled = !autoAimEnabled;
-        console.log(`Auto-aim ${autoAimEnabled ? 'enabled' : 'disabled'}`);
+function initListeners() {
+    window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if (e.code === 'KeyQ') {
+            autoAimEnabled = !autoAimEnabled;
+            console.log(`Auto-aim ${autoAimEnabled ? 'enabled' : 'disabled'}`);
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        keys[e.code] = false;
+        if (e.code === 'KeyR' && gameRunning) player.reload();
+        if (e.code === 'KeyE' && gameRunning) player.throwGrenade();
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        mousePos.x = e.clientX - rect.left;
+        mousePos.y = e.clientY - rect.top;
+    });
+    window.addEventListener('mousedown', () => {
+        if (gameRunning && player) player.shoot();
+    });
+
+    // Mobile input handling
+    if (moveBase) {
+        moveBase.addEventListener('touchstart', (e) => {
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
+            moveJoystick.active = true;
+            const rect = moveBase.getBoundingClientRect();
+            moveJoystick.startX = rect.left + rect.width / 2;
+            moveJoystick.startY = rect.top + rect.height / 2;
+            handleJoystickMove(touch);
+        });
+
+        moveBase.addEventListener('touchmove', (e) => {
+            if (!moveJoystick.active) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === joystickTouchId) {
+                    handleJoystickMove(touch);
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    joystickTouchId = null;
+                    moveJoystick.active = false;
+                    moveJoystick.x = 0;
+                    moveJoystick.y = 0;
+                    if (moveStick) moveStick.style.transform = `translate(-50%, -50%)`;
+                }
+            }
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === aimTouchId) {
+                    aimTouchId = null;
+                    isManualAiming = false;
+                }
+            }
+        });
     }
-});
-window.addEventListener('keyup', (e) => {
-    keys[e.code] = false;
-    if (e.code === 'KeyR' && gameRunning) player.reload();
-    if (e.code === 'KeyE' && gameRunning) player.throwGrenade();
-});
-window.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mousePos.x = e.clientX - rect.left;
-    mousePos.y = e.clientY - rect.top;
-});
-window.addEventListener('mousedown', () => {
-    if (gameRunning) player.shoot();
-});
 
-// Mobile input handling
-if (moveBase) {
-    moveBase.addEventListener('touchstart', (e) => {
-        const touch = e.changedTouches[0];
-        joystickTouchId = touch.identifier;
-        moveJoystick.active = true;
-        const rect = moveBase.getBoundingClientRect();
-        moveJoystick.startX = rect.left + rect.width / 2;
-        moveJoystick.startY = rect.top + rect.height / 2;
-        handleJoystickMove(touch);
-    });
+    if (btnShoot) btnShoot.addEventListener('touchstart', (e) => { if (gameRunning && player) player.shoot(); e.preventDefault(); });
+    if (btnReload) btnReload.addEventListener('touchstart', (e) => { if (gameRunning && player) player.reload(); e.preventDefault(); });
+    if (btnGrenade) btnGrenade.addEventListener('touchstart', (e) => { if (gameRunning && player) player.throwGrenade(); e.preventDefault(); });
 
-    moveBase.addEventListener('touchmove', (e) => {
-        if (!moveJoystick.active) return;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.identifier === joystickTouchId) {
-                handleJoystickMove(touch);
-                e.preventDefault();
+    if (canvas) {
+        canvas.addEventListener('touchstart', (e) => {
+            if (!moveJoystick.active && aimTouchId === null) {
+                const touch = e.changedTouches[0];
+                aimTouchId = touch.identifier;
+                isManualAiming = true;
+                const rect = canvas.getBoundingClientRect();
+                mousePos.x = touch.clientX - rect.left;
+                mousePos.y = touch.clientY - rect.top;
             }
-        }
-    }, { passive: false });
-
-    window.addEventListener('touchend', (e) => {
-        // If the lifted touch was the joystick touch, reset joystick
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === joystickTouchId) {
-                joystickTouchId = null;
-                moveJoystick.active = false;
-                moveJoystick.x = 0;
-                moveJoystick.y = 0;
-                if (moveStick) moveStick.style.transform = `translate(-50%, -50%)`;
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === aimTouchId) {
+                    const rect = canvas.getBoundingClientRect();
+                    mousePos.x = touch.clientX - rect.left;
+                    mousePos.y = touch.clientY - rect.top;
+                    e.preventDefault();
+                }
             }
-        }
-
-        // If the lifted touch was the aim touch, reset manual aiming
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === aimTouchId) {
-                aimTouchId = null;
-                isManualAiming = false;
-            }
-        }
-    });
+        }, { passive: false });
+    }
 }
 
 function handleJoystickMove(touch) {
@@ -119,41 +152,19 @@ function handleJoystickMove(touch) {
     }
 }
 
-if (btnShoot) btnShoot.addEventListener('touchstart', (e) => { if (gameRunning) player.shoot(); e.preventDefault(); });
-if (btnReload) btnReload.addEventListener('touchstart', (e) => { if (gameRunning) player.reload(); e.preventDefault(); });
-if (btnGrenade) btnGrenade.addEventListener('touchstart', (e) => { if (gameRunning) player.throwGrenade(); e.preventDefault(); });
-
-// Handle touch for aiming on mobile (touching anywhere else on canvas)
-canvas.addEventListener('touchstart', (e) => {
-    if (!moveJoystick.active && aimTouchId === null) {
-        const touch = e.changedTouches[0];
-        aimTouchId = touch.identifier;
-        isManualAiming = true;
-        const rect = canvas.getBoundingClientRect();
-        mousePos.x = touch.clientX - rect.left;
-        mousePos.y = touch.clientY - rect.top;
-    }
-});
-canvas.addEventListener('touchmove', (e) => {
-    // Check for our specific aim touch
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === aimTouchId) {
-            const rect = canvas.getBoundingClientRect();
-            mousePos.x = touch.clientX - rect.left;
-            mousePos.y = touch.clientY - rect.top;
-            e.preventDefault();
-        }
-    }
-}, { passive: false });
 
 // Resize canvas
 function resizeCanvas() {
+    if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    if (gameRunning && player) {
+        // Optional: reposition player or other elements if needed
+    }
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+// Call resize after a short delay to ensure DOM is fully ready
+setTimeout(resizeCanvas, 0);
 
 class Player {
     constructor() {
@@ -461,7 +472,7 @@ class Particle {
     }
 }
 
-let player = new Player();
+let player;
 let npcs = [];
 let loot = [];
 let particles = [];
@@ -578,22 +589,30 @@ function gameLoop() {
 }
 
 function startGame() {
-    player = new Player();
-    npcs = [];
-    loot = [];
-    particles = [];
-    score = 0;
-    kills = 0;
-    gameRunning = true;
-    startScreen.classList.add('hidden');
-    gameOverScreen.classList.add('hidden');
-    player.updateHUD();
-    
-    if (spawnInterval) clearInterval(spawnInterval);
-    spawnInterval = setInterval(spawnNPC, 1500);
-    
-    if (animationId) cancelAnimationFrame(animationId);
-    gameLoop();
+    console.log("Starting game...");
+    try {
+        player = new Player();
+        npcs = [];
+        loot = [];
+        particles = [];
+        score = 0;
+        kills = 0;
+        gameRunning = true;
+        
+        if (startScreen) startScreen.classList.add('hidden');
+        if (gameOverScreen) gameOverScreen.classList.add('hidden');
+        
+        if (player) player.updateHUD();
+        
+        if (spawnInterval) clearInterval(spawnInterval);
+        spawnInterval = setInterval(spawnNPC, 1500);
+        
+        if (animationId) cancelAnimationFrame(animationId);
+        gameLoop();
+        console.log("Game loop started");
+    } catch (error) {
+        console.error("Error starting game:", error);
+    }
 }
 
 function gameOver() {
@@ -604,11 +623,15 @@ function gameOver() {
     gameOverScreen.classList.remove('hidden');
 }
 
-startBtn.addEventListener('click', startGame);
-restartBtn.addEventListener('click', startGame);
-
-    gameOverScreen.classList.remove('hidden');
-}
-
-startBtn.addEventListener('click', startGame);
-restartBtn.addEventListener('click', startGame);
+// Initialize everything when DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+    initElements();
+    initListeners();
+    
+    // Initial resize
+    resizeCanvas();
+    
+    // Bind start buttons
+    if (startBtn) startBtn.addEventListener('click', startGame);
+    if (restartBtn) restartBtn.addEventListener('click', startGame);
+});
