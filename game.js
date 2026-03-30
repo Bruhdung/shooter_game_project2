@@ -202,6 +202,8 @@ class Player {
         this.scatterShot = false;
         this.fireShot = false;
         this.iceShot = false;
+        this.rocketLauncher = false;
+        this.rocketTimer = 0;
     }
 
     draw() {
@@ -290,6 +292,16 @@ class Player {
         // Clamp camera to world bounds
         camera.x = Math.max(0, Math.min(world.width - camera.width, camera.x));
         camera.y = Math.max(0, Math.min(world.height - camera.height, camera.y));
+
+        // Handle rocket launcher
+        if (this.rocketLauncher) {
+            this.rocketTimer--;
+            if (this.rocketTimer <= 0) {
+                const angle = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
+                rockets.push(new Rocket(this.x, this.y, angle));
+                this.rocketTimer = 300; // 5 seconds at 60fps
+            }
+        }
 
         this.bullets.forEach((b, i) => {
             b.update();
@@ -422,6 +434,55 @@ class Bullet {
     }
 }
 
+class Rocket {
+    constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.radius = 8;
+        this.speed = 15;
+        this.velocity = {
+            x: Math.cos(angle) * this.speed,
+            y: Math.sin(angle) * this.speed
+        };
+        this.color = '#ff4757'; // Red
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.atan2(this.velocity.y, this.velocity.x));
+        ctx.beginPath();
+        ctx.rect(-10, -5, 20, 10);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+
+    update() {
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+    }
+
+    explode() {
+        createExplosion(this.x, this.y, '#ffa502', 40, 80);
+        npcs.forEach((npc, nIndex) => {
+            const dist = Math.hypot(this.x - npc.x, this.y - npc.y);
+            if (dist < 100) { // Small explosion radius
+                npc.hp -= 50;
+                if (npc.hp <= 0) {
+                    if (npc instanceof ExplodingNPC) {
+                        npc.explode();
+                    }
+                    player.addXP(25);
+                    npcs.splice(nIndex, 1);
+                    kills++;
+                    player.updateHUD();
+                }
+            }
+        });
+    }
+}
+
 class Grenade {
     constructor(x, y, target) {
         this.x = x;
@@ -515,6 +576,27 @@ class NPC {
         const angle = Math.atan2(player.y - this.y, player.x - this.x);
         this.x += Math.cos(angle) * currentSpeed;
         this.y += Math.sin(angle) * currentSpeed;
+
+        // Wall collision for NPCs
+        walls.forEach(wall => {
+            if (this.x - this.radius < wall.x + wall.width &&
+                this.x + this.radius > wall.x &&
+                this.y - this.radius < wall.y + wall.height &&
+                this.y + this.radius > wall.y) {
+                
+                // Simple collision response: push back
+                const dx = this.x - (wall.x + wall.width / 2);
+                const dy = this.y - (wall.y + wall.height / 2);
+                
+                if (Math.abs(dx / wall.width) > Math.abs(dy / wall.height)) {
+                    if (dx > 0) this.x = wall.x + wall.width + this.radius;
+                    else this.x = wall.x - this.radius;
+                } else {
+                    if (dy > 0) this.y = wall.y + wall.height + this.radius;
+                    else this.y = wall.y - this.radius;
+                }
+            }
+        });
     }
 }
 
@@ -613,6 +695,7 @@ let npcs = [];
 let loot = [];
 let particles = [];
 let walls = [];
+let rockets = [];
 
 function spawnNPC() {
     if (gameRunning) {
@@ -714,6 +797,41 @@ function update() {
         p.update();
         if (p.alpha <= 0) particles.splice(i, 1);
     });
+
+    // Update rockets
+    rockets.forEach((rocket, rIndex) => {
+        rocket.update();
+        
+        // Out of world
+        if (rocket.x < 0 || rocket.x > world.width || rocket.y < 0 || rocket.y > world.height) {
+            rockets.splice(rIndex, 1);
+            return;
+        }
+
+        // Hit wall
+        let hitWall = false;
+        walls.forEach(wall => {
+            if (rocket.x > wall.x && rocket.x < wall.x + wall.width &&
+                rocket.y > wall.y && rocket.y < wall.y + wall.height) {
+                hitWall = true;
+            }
+        });
+        if (hitWall) {
+            rocket.explode();
+            rockets.splice(rIndex, 1);
+            return;
+        }
+
+        // Hit NPC
+        npcs.forEach(npc => {
+            const dist = Math.hypot(rocket.x - npc.x, rocket.y - npc.y);
+            if (dist < rocket.radius + npc.radius) {
+                rocket.explode();
+                rockets.splice(rIndex, 1);
+                return;
+            }
+        });
+    });
 }
 
 function draw() {
@@ -739,6 +857,7 @@ function draw() {
     player.draw();
     player.bullets.forEach(b => b.draw());
     player.grenadeList.forEach(g => g.draw());
+    rockets.forEach(r => r.draw());
 
     ctx.restore();
 }
@@ -763,6 +882,7 @@ function startGame() {
         loot = [];
         particles = [];
         walls = [];
+        rockets = [];
         score = 0;
         kills = 0;
         gameRunning = true;
@@ -804,6 +924,7 @@ const allUpgrades = [
     { id: 'ice', title: 'Cryo Rounds', description: 'Bullets slow down enemies.' },
     { id: 'hp', title: 'Health Boost', description: 'Increase max HP by 20.' },
     { id: 'speed', title: 'Speed Boost', description: 'Increase player movement speed.' },
+    { id: 'rocket', title: 'Rocket Launcher', description: 'Automatically fire a rocket every 5 seconds.' },
 ];
 
 function showUpgradeScreen() {
@@ -846,6 +967,10 @@ function applyUpgrade(upgradeId) {
             break;
         case 'speed':
             player.speed += 1;
+            break;
+        case 'rocket':
+            player.rocketLauncher = true;
+            player.rocketTimer = 300; // Start the 5-sec countdown
             break;
     }
 
